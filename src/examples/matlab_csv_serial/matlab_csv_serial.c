@@ -215,7 +215,6 @@ int matlab_csv_serial_thread_main(int argc, char *argv[])
 			warnx("no sensor data");
 
 		} else {
-
 			/* accel0 update available? */
 			if (fds[0].revents & POLLIN) {
 				orb_copy(ORB_ID(sensor_accel), accel0_sub, &accel0);

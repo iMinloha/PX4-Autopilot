@@ -54,7 +54,6 @@ struct orb_metadata {
 	uint32_t message_hash;	/**< Hash over all fields for message compatibility checks */
 	orb_id_size_t  o_id;                /**< ORB_ID enum */
 	uint8_t o_queue;					/**< queue size */
-
 };
 
 typedef const struct orb_metadata *orb_id_t;

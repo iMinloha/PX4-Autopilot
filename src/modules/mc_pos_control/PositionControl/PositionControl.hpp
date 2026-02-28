@@ -219,17 +219,17 @@ private:
 	bool _decouple_horizontal_and_vertical_acceleration{true}; ///< Ignore vertical acceleration setpoint to remove its effect on the tilt setpoint
 
 	// States
-	matrix::Vector3f _pos; /**< current position */
-	matrix::Vector3f _vel; /**< current velocity */
-	matrix::Vector3f _vel_dot; /**< velocity derivative (replacement for acceleration estimate) */
-	matrix::Vector3f _vel_int; /**< integral term of the velocity controller */
-	float _yaw{}; /**< current heading */
+	matrix::Vector3f _pos; 		/**< current position */
+	matrix::Vector3f _vel; 		/**< current velocity */
+	matrix::Vector3f _vel_dot; 	/**< velocity derivative (replacement for acceleration estimate) */
+	matrix::Vector3f _vel_int; 	/**< integral term of the velocity controller */
+	float _yaw{}; 			/**< current heading */
 
 	// Setpoints
-	matrix::Vector3f _pos_sp; /**< desired position */
-	matrix::Vector3f _vel_sp; /**< desired velocity */
-	matrix::Vector3f _acc_sp; /**< desired acceleration */
-	matrix::Vector3f _thr_sp; /**< desired thrust */
-	float _yaw_sp{}; /**< desired heading */
-	float _yawspeed_sp{}; /** desired yaw-speed */
+	matrix::Vector3f _pos_sp; 	/**< desired position */
+	matrix::Vector3f _vel_sp; 	/**< desired velocity */
+	matrix::Vector3f _acc_sp; 	/**< desired acceleration */
+	matrix::Vector3f _thr_sp; 	/**< desired thrust */
+	float _yaw_sp{}; 		/**< desired heading */
+	float _yawspeed_sp{}; 		/** desired yaw-speed */
 };

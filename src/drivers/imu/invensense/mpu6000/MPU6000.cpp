@@ -76,8 +76,7 @@ int MPU6000::init()
 	return Reset() ? 0 : -1;
 }
 
-bool MPU6000::Reset()
-{
+bool MPU6000::Reset() {
 	_state = STATE::RESET;
 	DataReadyInterruptDisable();
 	ScheduleClear();
@@ -85,8 +84,7 @@ bool MPU6000::Reset()
 	return true;
 }
 
-void MPU6000::exit_and_cleanup()
-{
+void MPU6000::exit_and_cleanup() {
 	DataReadyInterruptDisable();
 	I2CSPIDriverBase::exit_and_cleanup();
 }
@@ -395,10 +393,7 @@ void MPU6000::DataReady()
 
 bool MPU6000::DataReadyInterruptConfigure()
 {
-	if (_drdy_gpio == 0) {
-		return false;
-	}
-
+	if (_drdy_gpio == 0) return false;
 	// Setup data ready on falling edge
 	return px4_arch_gpiosetevent(_drdy_gpio, false, true, true, &DataReadyInterruptCallback, this) == 0;
 }
@@ -455,9 +450,7 @@ void MPU6000::RegisterSetAndClearBits(Register reg, uint8_t setbits, uint8_t cle
 
 	uint8_t val = (orig_val & ~clearbits) | setbits;
 
-	if (orig_val != val) {
-		RegisterWrite(reg, val);
-	}
+	if (orig_val != val) RegisterWrite(reg, val);
 }
 
 uint16_t MPU6000::FIFOReadCount()

@@ -176,6 +176,7 @@ void Ekf::reset()
 
 bool Ekf::update()
 {
+	// 判断滤波器是否初始化，如果没有则初始化
 	if (!_filter_initialised) {
 		_filter_initialised = initialiseFilter();
 
@@ -192,8 +193,8 @@ bool Ekf::update()
 		// TODO: explicitly pop at desired time horizon
 		const imuSample imu_sample_delayed = _imu_buffer.get_oldest();
 
-		// calculate an average filter update time
-		//  filter and limit input between -50% and +100% of nominal value
+		// 时间滤波器
+		// 数据更新导致的频率抖动叠加一个低通滤波器，并且权重系数很低，意味时间较为稳定
 		float input = 0.5f * (imu_sample_delayed.delta_vel_dt + imu_sample_delayed.delta_ang_dt);
 		float filter_update_s = 1e-6f * _params.filter_update_interval_us;
 		_dt_ekf_avg = 0.99f * _dt_ekf_avg + 0.01f * math::constrain(input, 0.5f * filter_update_s, 2.f * filter_update_s);
@@ -280,18 +281,20 @@ void Ekf::predictState(const imuSample &imu_delayed)
 {
 	// apply imu bias corrections
 	const Vector3f delta_ang_bias_scaled = getGyroBias() * imu_delayed.delta_ang_dt;
+	// 首先扣除陀螺偏置
 	Vector3f corrected_delta_ang = imu_delayed.delta_ang - delta_ang_bias_scaled;
 
-	// subtract component of angular rate due to earth rotation
+	// 扣除地球自转引起的陀螺测量增量
 	corrected_delta_ang -= _R_to_earth.transpose() * _earth_rate_NED * imu_delayed.delta_ang_dt;
 
+	// 生成姿态四元数增量
 	const Quatf dq(AxisAnglef{corrected_delta_ang});
 
 	// rotate the previous quaternion by the delta quaternion using a quaternion multiplication
 	_state.quat_nominal = (_state.quat_nominal * dq).normalized();
 	_R_to_earth = Dcmf(_state.quat_nominal);
 
-	// Calculate an earth frame delta velocity
+	// 速度的先验估计
 	const Vector3f delta_vel_bias_scaled = getAccelBias() * imu_delayed.delta_vel_dt;
 	const Vector3f corrected_delta_vel = imu_delayed.delta_vel - delta_vel_bias_scaled;
 	const Vector3f corrected_delta_vel_ef = _R_to_earth * corrected_delta_vel;
@@ -302,13 +305,13 @@ void Ekf::predictState(const imuSample &imu_delayed)
 	// calculate the increment in velocity using the current orientation
 	_state.vel += corrected_delta_vel_ef;
 
-	// compensate for acceleration due to gravity
+	// 重力补偿
 	_state.vel(2) += CONSTANTS_ONE_G * imu_delayed.delta_vel_dt;
 
-	// predict position states via trapezoidal integration of velocity
+	// 位置预测，使用梯形积分方法，使用当前和上一个速度值的平均值乘以时间增量来更新位置
 	_state.pos += (vel_last + _state.vel) * imu_delayed.delta_vel_dt * 0.5f;
 
-	// constrain states
+	// 状态量限幅
 	_state.vel = matrix::constrain(_state.vel, -1000.f, 1000.f);
 	_state.pos = matrix::constrain(_state.pos, -1.e6f, 1.e6f);
 

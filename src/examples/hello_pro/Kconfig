@@ -1,0 +1,5 @@
+menuconfig EXAMPLES_HELLO_PRO
+	bool "hello_pro"
+	default n
+	---help---
+		Enable support for hello_pro

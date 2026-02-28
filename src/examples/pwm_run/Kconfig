@@ -1,0 +1,5 @@
+menuconfig EXAMPLES_PWM_RUN
+	bool "pwm_run"
+	default n
+	---help---
+		pwm output in channel n

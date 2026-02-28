@@ -229,6 +229,7 @@ void EKFGSF_yaw::ahrsPredict(const uint8_t model_index, const Vector3f &delta_an
 	_ahrs_ekf_gsf[model_index].R = ahrsPredictRotMat(_ahrs_ekf_gsf[model_index].R, delta_angle_corrected);
 }
 
+// AHRS倾斜对准
 void EKFGSF_yaw::ahrsAlignTilt(const Vector3f &delta_vel)
 {
 	// Rotation matrix is constructed directly from acceleration measurement and will be the same for
@@ -236,15 +237,15 @@ void EKFGSF_yaw::ahrsAlignTilt(const Vector3f &delta_vel)
 	// 1) Yaw angle is zero - yaw is aligned later for each model when velocity fusion commences.
 	// 2) The vehicle is not accelerating so all of the measured acceleration is due to gravity.
 
-	// Calculate earth frame Down axis unit vector rotated into body frame
+	// Db就是重力方向的单位向量
 	const Vector3f down_in_bf = -delta_vel.normalized();
 
-	// Calculate earth frame North axis unit vector rotated into body frame, orthogonal to 'down_in_bf'
+	// Nb与Db正交，可以通过单位向量计算
 	const Vector3f i_vec_bf(1.f, 0.f, 0.f);
 	Vector3f north_in_bf = i_vec_bf - down_in_bf * (i_vec_bf.dot(down_in_bf));
 	north_in_bf.normalize();
 
-	// Calculate earth frame East axis unit vector rotated into body frame, orthogonal to 'down_in_bf' and 'north_in_bf'
+	// Eb正交与Nb和Db，直接叉乘就好
 	const Vector3f east_in_bf = down_in_bf % north_in_bf;
 
 	// Each column in a rotation matrix from earth frame to body frame represents the projection of the
@@ -415,11 +416,13 @@ void EKFGSF_yaw::initialiseEKFGSF(const Vector2f &vel_NE, const float vel_accura
 	}
 }
 
+// 高斯密度计算
 float EKFGSF_yaw::gaussianDensity(const uint8_t model_index) const
 {
 	// calculate transpose(innovation) * inv(S) * innovation
+	// 计算马氏距离
 	const float normDist = _ekf_gsf[model_index].innov.dot(_ekf_gsf[model_index].S_inverse * _ekf_gsf[model_index].innov);
-
+	// 返回马氏距离的高斯密度
 	return (1.f / (2.f * M_PI_F)) * sqrtf(_ekf_gsf[model_index].S_det_inverse) * expf(-0.5f * normDist);
 }
 

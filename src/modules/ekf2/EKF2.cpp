@@ -170,6 +170,7 @@ EKF2::EKF2(bool multi_mode, const px4::wq_config_t &config, bool replay_mode):
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	_param_ekf2_ev_delay(_params->ev_delay_ms),
 	_param_ekf2_ev_ctrl(_params->ev_ctrl),
+	_param_ekf2_test(_params->my_test),
 	_param_ekf2_ev_qmin(_params->ev_quality_minimum),
 	_param_ekf2_evp_noise(_params->ev_pos_noise),
 	_param_ekf2_evv_noise(_params->ev_vel_noise),
