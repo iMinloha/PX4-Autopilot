@@ -4,6 +4,6 @@ parameters:
   definitions:
     MINLOHA_EXAMPLE:
       description:
-        short: a little test
+        short: a little test, and this is a long description
       type: boolean
       default: 1
