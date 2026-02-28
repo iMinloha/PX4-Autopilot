@@ -78,9 +78,7 @@ Vector3f RateControl::update(const Vector3f &rate, const Vector3f &rate_sp, cons
 	const Vector3f torque = _gain_p.emult(rate_error) + _rate_int - _gain_d.emult(angular_accel) + _gain_ff.emult(rate_sp);
 
 	// update integral only if we are not landed
-	if (!landed) {
-		updateIntegral(rate_error, dt);
-	}
+	if (!landed) updateIntegral(rate_error, dt);
 
 	return torque;
 }
@@ -98,12 +96,11 @@ void RateControl::updateIntegral(Vector3f &rate_error, const float dt)
 			rate_error(i) = math::max(rate_error(i), 0.f);
 		}
 
-		// I term factor: reduce the I gain with increasing rate error.
-		// This counteracts a non-linear effect where the integral builds up quickly upon a large setpoint
-		// change (noticeable in a bounce-back effect after a flip).
-		// The formula leads to a gradual decrease w/o steps, while only affecting the cases where it should:
-		// with the parameter set to 400 degrees, up to 100 deg rate error, i_factor is almost 1 (having no effect),
-		// and up to 200 deg error leads to <25% reduction of I.
+		// I项因子：随着速率误差的增加，I增益减小。
+		// 这抵消了非线性效应，即积分在较大的设定点上迅速建立变化（翻转后反弹效果明显）。
+		// 该公式导致无步骤的逐步减少，同时只影响以下情况：
+		// 当参数设置为400度时，高达100度的速率误差，i_factor几乎为1（没有影响），
+		// 高达200度的误差导致I减少<25%。
 		float i_factor = rate_error(i) / math::radians(400.f);
 		i_factor = math::max(0.0f, 1.f - i_factor * i_factor);
 

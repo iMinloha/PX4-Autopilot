@@ -1296,6 +1296,15 @@ parameters:
           will simply be ignored instead of fusing the synthetic value.
       type: boolean
       default: 0
+    EKF2_TEST:
+      description:
+        short: this is test param
+        long: a littile example
+      type: enum
+      values:
+        0: hahaha
+        1: imSB
+      default: 0
     EKF2_GSF_TAS:
       description:
         short: Default value of true airspeed used in EKF-GSF AHRS calculation

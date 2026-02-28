@@ -45,6 +45,9 @@ void ZeroVelocityUpdate::reset()
 	_time_last_zero_velocity_fuse = 0;
 }
 
+// 抑制0速飘移
+// 当EKF估计两虚两帧都觉得自己是静止的时候，就会接管速度观察值为0，避免积分累积
+// 每200毫秒判断一次，避免影响低通滤波器
 bool ZeroVelocityUpdate::update(Ekf &ekf, const estimator::imuSample &imu_delayed)
 {
 	// Fuse zero velocity at a limited rate (every 200 milliseconds)

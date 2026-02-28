@@ -144,8 +144,7 @@ bool EKF2Selector::SelectInstance(uint8_t ekf_instance)
 	return false;
 }
 
-bool EKF2Selector::UpdateErrorScores()
-{
+bool EKF2Selector::UpdateErrorScores() {
 	// first check imu inconsistencies
 	_gyro_fault_detected = false;
 	uint32_t faulty_gyro_id = 0;

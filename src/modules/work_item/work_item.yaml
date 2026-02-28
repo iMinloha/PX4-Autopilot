@@ -1,0 +1,9 @@
+module_name: work_item
+parameters:
+- group: EKF2
+  definitions:
+    MINLOHA_EXAMPLE:
+      description:
+        short: a little test
+      type: boolean
+      default: 1

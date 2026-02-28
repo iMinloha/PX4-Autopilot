@@ -1,0 +1,5 @@
+menuconfig EXAMPLES_SERIAL_HELLO
+	bool "serial_hello"
+	default n
+	---help---
+		Display Hello in serial

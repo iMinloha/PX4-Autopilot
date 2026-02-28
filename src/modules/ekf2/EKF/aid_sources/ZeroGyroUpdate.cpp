@@ -46,30 +46,33 @@ void ZeroGyroUpdate::reset()
 	_zgup_delta_ang_dt = 0.f;
 }
 
+// 降低角速率变化的零偏
 bool ZeroGyroUpdate::update(Ekf &ekf, const estimator::imuSample &imu_delayed)
 {
 	// When at rest, fuse the gyro data as a direct observation of the gyro bias
 	if (ekf.control_status_flags().vehicle_at_rest) {
-		// Downsample gyro data to run the fusion at a lower rate
+		// 积分降采样
 		_zgup_delta_ang += imu_delayed.delta_ang;
 		_zgup_delta_ang_dt += imu_delayed.delta_ang_dt;
 
+		// 200ms更新一次
 		static constexpr float zgup_dt = 0.2f;
 		const bool zero_gyro_update_data_ready = _zgup_delta_ang_dt >= zgup_dt;
 
 		if (zero_gyro_update_data_ready) {
-
+			// 在静止期间的速率变化就是偏差
 			Vector3f gyro_bias = _zgup_delta_ang / _zgup_delta_ang_dt;
-
+			// 观测方差
 			const float obs_var = sq(math::constrain(ekf.getGyroNoise(), 0.f, 1.f));
 
+			// 这样就有了静止状态下对陀螺飘移的偏差修正
 			for (unsigned i = 0; i < 3; i++) {
 				const float innovation = ekf.state().gyro_bias(i) - gyro_bias(i);
 				const float innov_var = ekf.getGyroBiasVariance()(i) + obs_var;
 				ekf.fuseDirectStateMeasurement(innovation, innov_var, obs_var, State::gyro_bias.idx + i);
 			}
 
-			// Reset the integrators
+			// 重置积分器
 			_zgup_delta_ang.setZero();
 			_zgup_delta_ang_dt = 0.f;
 

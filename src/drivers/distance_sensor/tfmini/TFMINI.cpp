@@ -76,7 +76,7 @@ TFMINI::init()
 
 	switch (hw_model) {
 	case 1: // TFMINI (12m, 100 Hz)
-		// Note:
+		// Not:
 		// Sensor specification shows 0.3m as minimum, but in practice
 		// 0.3 is too close to minimum so chattering of invalid sensor decision
 		// is happening sometimes. this cause EKF to believe inconsistent range readings.

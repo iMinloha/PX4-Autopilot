@@ -470,8 +470,7 @@ bool MixingOutput::update()
 }
 
 void
-MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updates)
-{
+MixingOutput::limitAndUpdateOutputs(float outputs[MAX_ACTUATORS], bool has_updates) {
 	bool stop_motors = !_throttle_armed && !_actuator_test.inTestMode();
 
 	if (_armed.lockdown || _armed.manual_lockdown) {

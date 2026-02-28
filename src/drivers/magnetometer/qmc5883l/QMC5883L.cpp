@@ -104,68 +104,63 @@ int QMC5883L::probe()
 	return PX4_ERROR;
 }
 
-void QMC5883L::RunImpl()
-{
+void QMC5883L::RunImpl() {
 	const hrt_abstime now = hrt_absolute_time();
 
 	switch (_state) {
-	case STATE::RESET:
-		// CNTL2: Software Reset
-		RegisterWrite(Register::CNTL2, CNTL2_BIT::SOFT_RST);
-		_reset_timestamp = now;
-		_failure_count = 0;
-		_state = STATE::WAIT_FOR_RESET;
-		perf_count(_reset_perf);
-		ScheduleDelayed(100_ms); // POR Completion Time
-		break;
+		case STATE::RESET:
+			// CNTL2: Software Reset
+			RegisterWrite(Register::CNTL2, CNTL2_BIT::SOFT_RST);
+			_reset_timestamp = now;
+			_failure_count = 0;
+			_state = STATE::WAIT_FOR_RESET;
+			perf_count(_reset_perf);
+			ScheduleDelayed(100_ms); // POR Completion Time
+			break;
 
-	case STATE::WAIT_FOR_RESET:
+		case STATE::WAIT_FOR_RESET:
 
-		// SOFT_RST: This bit is automatically reset to zero after POR routine
-		if ((RegisterRead(Register::CHIP_ID) == Chip_ID)
-		    && ((RegisterRead(Register::CNTL2) & CNTL2_BIT::SOFT_RST) == 0)) {
+			// SOFT_RST: This bit is automatically reset to zero after POR routine
+			if ((RegisterRead(Register::CHIP_ID) == Chip_ID)
+			&& ((RegisterRead(Register::CNTL2) & CNTL2_BIT::SOFT_RST) == 0)) {
 
-			// if reset succeeded then configure
-			_state = STATE::CONFIGURE;
-			ScheduleDelayed(10_ms);
-
-		} else {
-			// RESET not complete
-			if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
-				PX4_DEBUG("Reset failed, retrying");
-				_state = STATE::RESET;
-				ScheduleDelayed(100_ms);
-
-			} else {
-				PX4_DEBUG("Reset not complete, check again in 10 ms");
+				// if reset succeeded then configure
+				_state = STATE::CONFIGURE;
 				ScheduleDelayed(10_ms);
-			}
-		}
-
-		break;
-
-	case STATE::CONFIGURE:
-		if (Configure()) {
-			// if configure succeeded then start reading every 20 ms (50 Hz)
-			_state = STATE::READ;
-			ScheduleOnInterval(20_ms, 20_ms);
-
-		} else {
-			// CONFIGURE not complete
-			if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
-				PX4_DEBUG("Configure failed, resetting");
-				_state = STATE::RESET;
 
 			} else {
-				PX4_DEBUG("Configure failed, retrying");
-			}
+				// RESET not complete
+				if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
+					PX4_DEBUG("Reset failed, retrying");
+					_state = STATE::RESET;
+					ScheduleDelayed(100_ms);
 
-			ScheduleDelayed(100_ms);
-		}
+				} else {
+					PX4_DEBUG("Reset not complete, check again in 10 ms");
+					ScheduleDelayed(10_ms);
+				}
+			} break;
 
-		break;
+		case STATE::CONFIGURE:
+			if (Configure()) {
+				// if configure succeeded then start reading every 20 ms (50 Hz)
+				_state = STATE::READ;
+				ScheduleOnInterval(20_ms, 20_ms);
 
-	case STATE::READ: {
+			} else {
+				// CONFIGURE not complete
+				if (hrt_elapsed_time(&_reset_timestamp) > 1000_ms) {
+					PX4_DEBUG("Configure failed, resetting");
+					_state = STATE::RESET;
+
+				} else {
+					PX4_DEBUG("Configure failed, retrying");
+				}
+
+				ScheduleDelayed(100_ms);
+			} break;
+
+		case STATE::READ: {
 			struct TransferBuffer {
 				uint8_t X_LSB;
 				uint8_t X_MSB;
@@ -234,9 +229,7 @@ void QMC5883L::RunImpl()
 					Reset();
 				}
 			}
-		}
-
-		break;
+		} break;
 	}
 }
 

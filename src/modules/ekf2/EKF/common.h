@@ -424,6 +424,7 @@ struct parameters {
 #if defined(CONFIG_EKF2_EXTERNAL_VISION)
 	// vision position fusion
 	int32_t ev_ctrl{0};
+	int32_t my_test{0};
 	float ev_delay_ms{175.0f};              ///< off-board vision measurement delay relative to the IMU (mSec)
 
 	float ev_vel_noise{0.1f};               ///< minimum allowed observation noise for EV velocity fusion (m/sec)

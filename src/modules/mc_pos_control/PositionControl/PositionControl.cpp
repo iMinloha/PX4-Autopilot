@@ -74,13 +74,18 @@ void PositionControl::setHorizontalThrustMargin(const float margin)
 
 void PositionControl::updateHoverThrust(const float hover_thrust_new)
 {
-	// Given that the equation for thrust is T = a_sp * Th / g - Th
-	// with a_sp = desired acceleration, Th = hover thrust and g = gravity constant,
-	// we want to find the acceleration that needs to be added to the integrator in order obtain
-	// the same thrust after replacing the current hover thrust by the new one.
-	// T' = T => a_sp' * Th' / g - Th' = a_sp * Th / g - Th
-	// so a_sp' = (a_sp - g) * Th / Th' + g
-	// we can then add a_sp' - a_sp to the current integrator to absorb the effect of changing Th by Th'
+	// 定义T_{hover}, 牛顿2定律可知,当飞机悬浮时,推力等于重力
+	// 当产生期望加速度时, 飞机推力：T = ma_{sp}+mg (受力平衡)
+	// 此时悬浮推力Th=mg
+	// T = m a_{sp} + Th
+	// T = Th * a_{sp} / g - Th
+	// 这个函数的目的是: 当悬浮推力发生变化(hover_thrust_new)时, 如何调整加速度使得总推力不变
+	// T' = Th' * a_{sp}' / g - Th'
+	// 我们希望T=T'则联立
+	// Th * a_{sp} / g + Th = Th' * a_{sp}' / g + Th'
+	// 求解一下得到：a_{sp}' = (a_{sp}-g)*Th / Th' + g
+	// 将其进行积分就得到:
+	// v' = v + (a_{sp}' - a_{sp})
 	const float previous_hover_thrust = _hover_thrust;
 	setHoverThrust(hover_thrust_new);
 
