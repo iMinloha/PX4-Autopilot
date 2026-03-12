@@ -17,6 +17,14 @@ void ESO::update(float y, float u, float dt) {
         _z3 = clamp(_z3, -1000.0f, 1000.0f);
 }
 
+void ESO::setParameters(float beta1, float beta2, float beta3, float b0)
+{
+        _beta1 = beta1;
+        _beta2 = beta2;
+        _beta3 = beta3;
+        _b0 = b0;
+}
+
 
 float ESO::get_state() {
 	return _z1;
@@ -44,11 +52,19 @@ float NLSEF::calculate(float e1, float e2) {
         return u1 + u2;
 }
 
+void NLSEF::setParameters(float kp, float kd, float alpha, float delta)
+{
+        _kp = kp;
+        _kd = kd;
+        _alpha = alpha;
+        _delta = delta;
+}
+
 float NLSEF::fal(float x, float alpha, float delta) {
-	if (fabs(x) <= delta) {
+	if (fabsf(x) <= delta) {
 		return x / (powf(delta, 1.0f - alpha));
 	} else {
-		return powf(fabs(x), alpha) * sign(x);
+		return powf(fabsf(x), alpha) * sign(x);
 	}
 }
 
@@ -63,6 +79,18 @@ float NLSEF::sign(float x) {
 
 
 TD::TD(float r, float h0) : _r(r), _h0(h0) {
+}
+
+void TD::setParameters(float r, float h0)
+{
+        _r = r;
+        _h0 = h0;
+}
+
+void TD::reset()
+{
+        v1 = 0.0f;
+        v2 = 0.0f;
 }
 
 void TD::update(float v, float dt) {
@@ -81,7 +109,7 @@ float TD::fhan(float x1, float x2, float r, float h) {
         float a0 = h * x2;
         float y = x1 + a0;
 
-        float a1 = sqrt(d * (d + 8 * fabs(y)));
+        float a1 = sqrtf(d * (d + 8 * fabsf(y)));
         float a2 = a0 + sign(y) * (a1 - d) / 2.0f;
 
         float sy = (sign(y + d) - sign(y - d)) / 2.0f;
@@ -140,4 +168,48 @@ float ADRC::update(float setpoint, float measurement, float dt) {
         _last_e2 = e2;
 
         return u;
+}
+
+void ADRC::setParameters(float omega, float kp, float kd, float alpha, float delta, float r, float h0, float b0)
+{
+        setBandwidth(omega);
+        setNlsefParameters(kp, kd, alpha, delta);
+        setTdParameters(r, h0);
+        setObserverB0(b0);
+}
+
+void ADRC::setBandwidth(float omega)
+{
+        _omega = omega;
+        _eso.setParameters(_omega, 3.0f * _omega * _omega, _omega * _omega * _omega, _b0);
+}
+
+void ADRC::setNlsefParameters(float kp, float kd, float alpha, float delta)
+{
+        _nlsef.setParameters(kp, kd, alpha, delta);
+}
+
+void ADRC::setTdParameters(float r, float h0)
+{
+        _td.setParameters(r, h0);
+}
+
+void ADRC::setObserverB0(float b0)
+{
+        _b0 = b0;
+        _eso.setParameters(_omega, 3.0f * _omega * _omega, _omega * _omega * _omega, _b0);
+}
+
+void ADRC::reset()
+{
+        _td.reset();
+        _eso.reset();
+        _u_prev = 0.0f;
+        _last_v1 = 0.0f;
+        _last_v2 = 0.0f;
+        _last_z1 = 0.0f;
+        _last_z2 = 0.0f;
+        _last_z3 = 0.0f;
+        _last_e1 = 0.0f;
+        _last_e2 = 0.0f;
 }

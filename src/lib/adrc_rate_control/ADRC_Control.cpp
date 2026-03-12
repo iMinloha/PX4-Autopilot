@@ -3,83 +3,78 @@
 
 using namespace matrix;
 
-void ADRC_Control::setPidGains(const Vector3f &P, const Vector3f &I, const Vector3f &D)
+void ADRC_Control::setAdrcGains(const Vector3f &kp, const Vector3f &kd)
 {
-	_gain_p = P;
-	_gain_i = I;
-	_gain_d = D;
+	_adrc_kp = kp;
+	_adrc_kd = kd;
+
+	_adrc_roll_controller.setNlsefParameters(_adrc_kp(0), _adrc_kd(0), _adrc_alpha(0), _adrc_delta(0));
+	_adrc_pitch_controller.setNlsefParameters(_adrc_kp(1), _adrc_kd(1), _adrc_alpha(1), _adrc_delta(1));
+	_adrc_yaw_controller.setNlsefParameters(_adrc_kp(2), _adrc_kd(2), _adrc_alpha(2), _adrc_delta(2));
 }
 
-void ADRC_Control::setSaturationStatus(const Vector3<bool> &saturation_positive,
-				      const Vector3<bool> &saturation_negative)
+void ADRC_Control::setAdrcBandwidth(float bandwidth)
 {
-	_control_allocator_saturation_positive = saturation_positive;
-	_control_allocator_saturation_negative = saturation_negative;
+	_adrc_roll_controller.setBandwidth(bandwidth);
+	_adrc_pitch_controller.setBandwidth(bandwidth);
+	_adrc_yaw_controller.setBandwidth(bandwidth);
 }
 
-void ADRC_Control::setPositiveSaturationFlag(size_t axis, bool is_saturated)
+void ADRC_Control::setAdrcNonlinearParams(const Vector3f &alpha, const Vector3f &delta)
 {
-	if (axis < 3) {
-		_control_allocator_saturation_positive(axis) = is_saturated;
+	_adrc_alpha = alpha;
+	_adrc_delta = delta;
+
+	_adrc_roll_controller.setNlsefParameters(_adrc_kp(0), _adrc_kd(0), _adrc_alpha(0), _adrc_delta(0));
+	_adrc_pitch_controller.setNlsefParameters(_adrc_kp(1), _adrc_kd(1), _adrc_alpha(1), _adrc_delta(1));
+	_adrc_yaw_controller.setNlsefParameters(_adrc_kp(2), _adrc_kd(2), _adrc_alpha(2), _adrc_delta(2));
+}
+
+void ADRC_Control::setAdrcTdParams(const Vector3f &r, const Vector3f &h0)
+{
+	_adrc_roll_controller.setTdParameters(r(0), h0(0));
+	_adrc_pitch_controller.setTdParameters(r(1), h0(1));
+	_adrc_yaw_controller.setTdParameters(r(2), h0(2));
+}
+
+void ADRC_Control::setAdrcObserverGain(const Vector3f &b0)
+{
+	_adrc_roll_controller.setObserverB0(b0(0));
+	_adrc_pitch_controller.setObserverB0(b0(1));
+	_adrc_yaw_controller.setObserverB0(b0(2));
+}
+
+Vector3f ADRC_Control::update(const Vector3f &rate, const Vector3f &rate_sp, const float dt, const bool landed)
+{
+	if (dt <= 0.f || !PX4_ISFINITE(dt)) {
+		return _gain_ff.emult(rate_sp);
 	}
-}
 
-void ADRC_Control::setNegativeSaturationFlag(size_t axis, bool is_saturated)
-{
-	if (axis < 3) {
-		_control_allocator_saturation_negative(axis) = is_saturated;
+	Vector3f torque;
+	torque(0) = _adrc_roll_controller.update(rate_sp(0), rate(0), dt);
+	torque(1) = _adrc_pitch_controller.update(rate_sp(1), rate(1), dt);
+	torque(2) = _adrc_yaw_controller.update(rate_sp(2), rate(2), dt);
+
+	// Keep optional direct rate-to-torque feed-forward for compatibility.
+	torque += _gain_ff.emult(rate_sp);
+
+	if (landed) {
+		resetAdrc();
 	}
-}
-
-Vector3f ADRC_Control::update(const Vector3f &rate, const Vector3f &rate_sp, const Vector3f &angular_accel,
-			     const float dt, const bool landed)
-{
-	// angular rates error
-	Vector3f rate_error = rate_sp - rate;
-
-	// PID control with feed forward
-	const Vector3f torque = _gain_p.emult(rate_error) + _rate_int - _gain_d.emult(angular_accel) + _gain_ff.emult(rate_sp);
-
-	// update integral only if we are not landed
-	if (!landed) updateIntegral(rate_error, dt);
 
 	return torque;
 }
 
-void ADRC_Control::updateIntegral(Vector3f &rate_error, const float dt)
+void ADRC_Control::resetAdrc()
 {
-	for (int i = 0; i < 3; i++) {
-		// prevent further positive control saturation
-		if (_control_allocator_saturation_positive(i)) {
-			rate_error(i) = math::min(rate_error(i), 0.f);
-		}
-
-		// prevent further negative control saturation
-		if (_control_allocator_saturation_negative(i)) {
-			rate_error(i) = math::max(rate_error(i), 0.f);
-		}
-
-		// I项因子：随着速率误差的增加，I增益减小。
-		// 这抵消了非线性效应，即积分在较大的设定点上迅速建立变化（翻转后反弹效果明显）。
-		// 该公式导致无步骤的逐步减少，同时只影响以下情况：
-		// 当参数设置为400度时，高达100度的速率误差，i_factor几乎为1（没有影响），
-		// 高达200度的误差导致I减少<25%。
-		float i_factor = rate_error(i) / math::radians(400.f);
-		i_factor = math::max(0.0f, 1.f - i_factor * i_factor);
-
-		// Perform the integration using a first order method
-		float rate_i = _rate_int(i) + i_factor * _gain_i(i) * rate_error(i) * dt;
-
-		// do not propagate the result if out of range or invalid
-		if (PX4_ISFINITE(rate_i)) {
-			_rate_int(i) = math::constrain(rate_i, -_lim_int(i), _lim_int(i));
-		}
-	}
+	_adrc_roll_controller.reset();
+	_adrc_pitch_controller.reset();
+	_adrc_yaw_controller.reset();
 }
 
 void ADRC_Control::getRateControlStatus(rate_ctrl_status_s &rate_ctrl_status)
 {
-	rate_ctrl_status.rollspeed_integ = _rate_int(0);
-	rate_ctrl_status.pitchspeed_integ = _rate_int(1);
-	rate_ctrl_status.yawspeed_integ = _rate_int(2);
+	rate_ctrl_status.rollspeed_integ = 0.f;
+	rate_ctrl_status.pitchspeed_integ = 0.f;
+	rate_ctrl_status.yawspeed_integ = 0.f;
 }

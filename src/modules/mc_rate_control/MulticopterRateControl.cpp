@@ -75,21 +75,46 @@ MulticopterRateControl::init()
 void
 MulticopterRateControl::parameters_updated()
 {
-	// rate control parameters
-	// The controller gain K is used to convert the parallel (P + I/s + sD) form
-	// to the ideal (K * [1 + 1/sTi + sTd]) form
-	const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
+	_use_adrc = _param_mc_use_adrc.get();
 
-	_rate_control.setPidGains(
-		rate_k.emult(Vector3f(_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get())),
-		rate_k.emult(Vector3f(_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get())),
-		rate_k.emult(Vector3f(_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get())));
+	if (_use_adrc) {
+		_adrc_rate_control.setAdrcGains(
+			Vector3f(_param_mc_adrc_r_kp.get(), _param_mc_adrc_p_kp.get(), _param_mc_adrc_y_kp.get()),
+			Vector3f(_param_mc_adrc_r_kd.get(), _param_mc_adrc_p_kd.get(), _param_mc_adrc_y_kd.get()));
 
-	_rate_control.setIntegratorLimit(
-		Vector3f(_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()));
+		_adrc_rate_control.setAdrcNonlinearParams(
+			Vector3f(_param_mc_adrc_alpha.get(), _param_mc_adrc_alpha.get(), _param_mc_adrc_alpha.get()),
+			Vector3f(_param_mc_adrc_delta.get(), _param_mc_adrc_delta.get(), _param_mc_adrc_delta.get()));
 
-	_rate_control.setFeedForwardGain(
-		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
+		_adrc_rate_control.setAdrcTdParams(
+			Vector3f(_param_mc_adrc_td_r.get(), _param_mc_adrc_td_r.get(), _param_mc_adrc_td_r.get()),
+			Vector3f(_param_mc_adrc_td_h0.get(), _param_mc_adrc_td_h0.get(), _param_mc_adrc_td_h0.get()));
+
+		_adrc_rate_control.setAdrcObserverGain(
+			Vector3f(_param_mc_adrc_r_b0.get(), _param_mc_adrc_p_b0.get(), _param_mc_adrc_y_b0.get()));
+
+		_adrc_rate_control.setAdrcBandwidth(_param_mc_adrc_bandwidth.get());
+
+		_adrc_rate_control.setFeedForwardGain(
+			Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
+
+	} else {
+		// rate control parameters
+		// The controller gain K is used to convert the parallel (P + I/s + sD) form
+		// to the ideal (K * [1 + 1/sTi + sTd]) form
+		const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
+
+		_pid_rate_control.setPidGains(
+			rate_k.emult(Vector3f(_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get())),
+			rate_k.emult(Vector3f(_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get())),
+			rate_k.emult(Vector3f(_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get())));
+
+		_pid_rate_control.setIntegratorLimit(
+			Vector3f(_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()));
+
+		_pid_rate_control.setFeedForwardGain(
+			Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
+	}
 
 
 	// manual rate control acro mode rate limits
@@ -188,13 +213,15 @@ MulticopterRateControl::Run()
 
 			// reset integral if disarmed
 			if (!_vehicle_control_mode.flag_armed || _vehicle_status.vehicle_type != vehicle_status_s::VEHICLE_TYPE_ROTARY_WING) {
-				_rate_control.resetIntegral();
+				_pid_rate_control.resetIntegral();
+				_adrc_rate_control.resetAdrc();
 			}
 
 			// update saturation status from control allocation feedback
 			control_allocator_status_s control_allocator_status;
 
-			if (_control_allocator_status_sub.update(&control_allocator_status)) {
+			// pid need the saturation status for anti-windup, while adrc doesn't use it
+			if (!_use_adrc && _control_allocator_status_sub.update(&control_allocator_status)) {
 				Vector<bool, 3> saturation_positive;
 				Vector<bool, 3> saturation_negative;
 
@@ -210,15 +237,22 @@ MulticopterRateControl::Run()
 				}
 
 				// TODO: send the unallocated value directly for better anti-windup
-				_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
+				_pid_rate_control.setSaturationStatus(saturation_positive, saturation_negative);
 			}
 
-			// run rate controller, at here we can edit pid to adrc
-			const Vector3f att_control = _rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
+			// add adrc control status to the rate control status message for logging/debugging
+			const Vector3f att_control = _use_adrc
+						      ? _adrc_rate_control.update(rates, _rates_setpoint, dt, _maybe_landed || _landed)
+						      : _pid_rate_control.update(rates, _rates_setpoint, angular_accel, dt, _maybe_landed || _landed);
 
 			// publish rate controller status
 			rate_ctrl_status_s rate_ctrl_status{};
-			_rate_control.getRateControlStatus(rate_ctrl_status);
+			if (_use_adrc) {
+				_adrc_rate_control.getRateControlStatus(rate_ctrl_status);
+
+			} else {
+				_pid_rate_control.getRateControlStatus(rate_ctrl_status);
+			}
 			rate_ctrl_status.timestamp = hrt_absolute_time();
 			_controller_status_pub.publish(rate_ctrl_status);
 
@@ -338,6 +372,7 @@ This implements the multicopter rate controller. It takes rate setpoints (in acr
 via `manual_control_setpoint` topic) as inputs and outputs actuator control messages.
 
 The controller has a PID loop for angular rate error.
+ADRC can be enabled with parameter MC_USE_ADRC.
 
 )DESCR_STR");
 

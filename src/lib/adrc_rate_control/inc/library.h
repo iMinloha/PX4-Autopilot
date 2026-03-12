@@ -12,6 +12,7 @@ public:
 		: _beta1(beta1), _beta2(beta2), _beta3(beta3), _b0(b0) {}
 
 	void update(float y, float u, float dt);
+	void setParameters(float beta1, float beta2, float beta3, float b0);
 
 	// 获取状态
 	float get_state();
@@ -35,6 +36,7 @@ public:
 	NLSEF(float kp = 1.5f, float kd = 0.5f, float alpha = 0.75f, float delta = 0.1f) : _kp(kp), _kd(kd), _alpha(alpha), _delta(delta) {};
 
 	float calculate(float e1, float e2);
+	void setParameters(float kp, float kd, float alpha, float delta);
 private:
 	float fal(float x, float alpha, float delta);
 	float sign(float x);
@@ -52,6 +54,8 @@ public:
 
     // update the TD state with the input signal v and time step dt
     void update(float v, float dt);
+	void setParameters(float r, float h0);
+	void reset();
 
     float get_state();
     float get_derivative();
@@ -82,18 +86,24 @@ public:
 	 */
 	ADRC(float omega = 10, float kp = 1.5f, float kd = 0.5f, float alpha = 0.75f, float delta = 0.1f,
 		float r = 100.0f, float h0 = 0.01f, float b0 = 1.0f)
-		: _td(r, h0), _eso(omega, 3 * omega * omega, omega * omega * omega, b0), _nlsef(kp, kd, alpha, delta), _b0(b0) {}
+		: _td(r, h0), _eso(omega, 3 * omega * omega, omega * omega * omega, b0), _nlsef(kp, kd, alpha, delta), _b0(b0), _omega(omega) {}
 
 	float update(float setpoint, float measurement, float dt);
+	void setParameters(float omega, float kp, float kd, float alpha, float delta, float r, float h0, float b0);
+	void setBandwidth(float omega);
+	void setNlsefParameters(float kp, float kd, float alpha, float delta);
+	void setTdParameters(float r, float h0);
+	void setObserverB0(float b0);
+	void reset();
 
 private:
 	TD _td;
 	ESO _eso;
 	NLSEF _nlsef;
 	float _b0;
+	float _omega;
 
 	float _u_prev = 0.0f;
-
 
 	mutable float _last_v1 = 0.0f, _last_v2 = 0.0f;
 	mutable float _last_z1 = 0.0f, _last_z2 = 0.0f, _last_z3 = 0.0f;

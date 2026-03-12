@@ -38,6 +38,243 @@
  */
 
 /**
+ * Enable ADRC rate control
+ *
+ * Set to 1 to use Active Disturbance Rejection Control (ADRC) for multicopter rate control.
+ * When enabled, all ADRC-specific parameters (MC_ADRC_*) take effect and PID gains are ignored.
+ * Disabled by default; PID is the primary controller.
+ *
+ * @boolean
+ * @reboot_required false
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_INT32(USE_ADRC, 0);
+
+/**
+ * ADRC Extended State Observer (ESO) bandwidth
+ *
+ * Observer bandwidth omega_o (rad/s). The three ESO pole coefficients are placed at -omega_o:
+ *   beta1 = omega_o, beta2 = 3*omega_o^2, beta3 = omega_o^3
+ * A larger value yields faster disturbance estimation but amplifies sensor noise.
+ * Typical range for multicopters: 5~50 rad/s.
+ *
+ * @unit rad/s
+ * @min 1.0
+ * @max 200.0
+ * @decimal 2
+ * @increment 0.5
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_BANDWIDTH, 10.0f);
+
+/**
+ * ADRC roll axis NLSEF proportional gain kp
+ *
+ * Nonlinear State Error Feedback (NLSEF) proportional gain for the roll axis.
+ * Scales the fal(e1, alpha, delta) term. Increasing this value speeds up error convergence
+ * but may cause overshoot. Typical range: 0.5~5.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_R_KP, 1.5f);
+
+/**
+ * ADRC pitch axis NLSEF proportional gain kp
+ *
+ * Nonlinear State Error Feedback (NLSEF) proportional gain for the pitch axis.
+ * Scales the fal(e1, alpha, delta) term. Increasing this value speeds up error convergence
+ * but may cause overshoot. Typical range: 0.5~5.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_P_KP, 1.5f);
+
+/**
+ * ADRC yaw axis NLSEF proportional gain kp
+ *
+ * Nonlinear State Error Feedback (NLSEF) proportional gain for the yaw axis.
+ * Scales the fal(e1, alpha, delta) term. The yaw axis typically requires smaller gains
+ * than roll/pitch. Typical range: 0.5~5.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_Y_KP, 1.5f);
+
+/**
+ * ADRC roll axis NLSEF derivative gain kd
+ *
+ * Nonlinear State Error Feedback (NLSEF) derivative gain for the roll axis.
+ * Scales the fal(e2, alpha, delta) term where e2 is the rate error.
+ * Increasing this value improves damping and reduces oscillation. Typical range: 0.1~2.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_R_KD, 0.5f);
+
+/**
+ * ADRC pitch axis NLSEF derivative gain kd
+ *
+ * Nonlinear State Error Feedback (NLSEF) derivative gain for the pitch axis.
+ * Scales the fal(e2, alpha, delta) term where e2 is the rate error.
+ * Increasing this value improves damping and reduces oscillation. Typical range: 0.1~2.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_P_KD, 0.5f);
+
+/**
+ * ADRC yaw axis NLSEF derivative gain kd
+ *
+ * Nonlinear State Error Feedback (NLSEF) derivative gain for the yaw axis.
+ * Scales the fal(e2, alpha, delta) term where e2 is the rate error.
+ * Increasing this value improves damping and reduces oscillation. Typical range: 0.1~2.0.
+ *
+ * @min 0.0
+ * @max 20.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_Y_KD, 0.5f);
+
+/**
+ * ADRC NLSEF nonlinearity exponent alpha
+ *
+ * Controls the shape of the fal(x, alpha, delta) nonlinear function used in NLSEF and ESO.
+ * Must be strictly between 0 and 1 (exclusive). Values closer to 0 produce stronger
+ * nonlinearity (better small-error response); values closer to 1 approach linear behavior.
+ * Shared across all three axes (roll, pitch, yaw). Recommended: 0.5~0.9.
+ *
+ * @min 0.01
+ * @max 0.99
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_ALPHA, 0.75f);
+
+/**
+ * ADRC NLSEF linear zone threshold delta
+ *
+ * Boundary of the linear region in the fal(x, alpha, delta) function.
+ * When |x| < delta, fal is linear (slope = delta^(alpha-1)); outside this zone it is
+ * a power-law function |x|^alpha * sign(x). A smaller delta increases nonlinearity
+ * sensitivity near zero. Shared across all three axes. Typical range: 0.01~0.5.
+ *
+ * @min 0.001
+ * @max 1.0
+ * @decimal 4
+ * @increment 0.005
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_DELTA, 0.1f);
+
+/**
+ * ADRC Tracking Differentiator (TD) speed factor r
+ *
+ * Determines how quickly the TD tracks the setpoint and extracts its derivative.
+ * A larger r allows faster tracking but amplifies high-frequency noise in the derivative
+ * estimate. Must satisfy r > 1/(h0^2) to avoid numerical instability.
+ * Shared across all three axes. Typical range: 50~500.
+ *
+ * @unit m/s^2
+ * @min 1.0
+ * @max 1000.0
+ * @decimal 1
+ * @increment 5.0
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_TD_R, 50.0f);
+
+/**
+ * ADRC Tracking Differentiator (TD) filter time step h0
+ *
+ * Integration step size used inside the TD fhan() algorithm. Should be set to the
+ * control loop sample period or slightly larger for added filtering. A larger h0
+ * provides smoother derivative estimates at the cost of tracking speed.
+ * Shared across all three axes. Typical range: 0.002~0.05 s.
+ *
+ * @unit s
+ * @min 0.001
+ * @max 0.1
+ * @decimal 4
+ * @increment 0.001
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_TD_H0, 0.01f);
+
+/**
+ * ADRC roll axis ESO control input gain b0
+ *
+ * Approximate control effectiveness for the roll axis, representing the ratio of
+ * control torque to angular acceleration (b0 ≈ 1/J_roll for pure inertia model).
+ * Inaccuracy in b0 is compensated by the ESO as disturbance, but larger errors
+ * degrade observer performance. Start with b0 = 1.0 and adjust based on vehicle response.
+ *
+ * @unit rad/s^2
+ * @min 0.01
+ * @max 100.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_R_B0, 1.0f);
+
+/**
+ * ADRC pitch axis ESO control input gain b0
+ *
+ * Approximate control effectiveness for the pitch axis, representing the ratio of
+ * control torque to angular acceleration (b0 ≈ 1/J_pitch for pure inertia model).
+ * Inaccuracy in b0 is compensated by the ESO as disturbance, but larger errors
+ * degrade observer performance. Start with b0 = 1.0 and adjust based on vehicle response.
+ *
+ * @unit rad/s^2
+ * @min 0.01
+ * @max 100.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_P_B0, 1.0f);
+
+/**
+ * ADRC yaw axis ESO control input gain b0
+ *
+ * Approximate control effectiveness for the yaw axis, representing the ratio of
+ * control torque to angular acceleration (b0 ≈ 1/J_yaw for pure inertia model).
+ * The yaw axis typically has lower control authority than roll/pitch, so this value
+ * may need to be tuned independently. Start with b0 = 1.0.
+ *
+ * @unit rad/s^2
+ * @min 0.01
+ * @max 100.0
+ * @decimal 3
+ * @increment 0.01
+ * @group Multicopter Rate Control
+ */
+PARAM_DEFINE_FLOAT(ADRC_Y_B0, 1.0f);
+
+/**
  * Roll rate P gain
  *
  * Roll rate proportional gain, i.e. control output for angular speed error 1 rad/s.

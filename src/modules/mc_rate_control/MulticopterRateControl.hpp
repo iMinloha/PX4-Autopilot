@@ -33,6 +33,7 @@
 
 #pragma once
 
+#include <lib/adrc_rate_control/ADRC_Control.h>
 #include <lib/rate_control/rate_control.hpp>
 #include <lib/matrix/matrix/math.hpp>
 #include <lib/perf/perf_counter.h>
@@ -89,7 +90,9 @@ private:
 
 	void updateActuatorControlsStatus(const vehicle_torque_setpoint_s &vehicle_torque_setpoint, float dt);
 
-	RateControl _rate_control; ///< class for rate control calculations
+	RateControl _pid_rate_control;   ///< PID rate control calculations
+	ADRC_Control _adrc_rate_control; ///< ADRC rate control calculations
+	bool _use_adrc{false};
 
 	uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
 	uORB::Subscription _control_allocator_status_sub{ORB_ID(control_allocator_status)};
@@ -130,6 +133,22 @@ private:
 	float _control_energy[4] {};
 
 	DEFINE_PARAMETERS(
+		(ParamBool<px4::params::USE_ADRC>) _param_mc_use_adrc,
+		(ParamFloat<px4::params::ADRC_BANDWIDTH>) _param_mc_adrc_bandwidth,
+		(ParamFloat<px4::params::ADRC_R_KP>) _param_mc_adrc_r_kp,
+		(ParamFloat<px4::params::ADRC_P_KP>) _param_mc_adrc_p_kp,
+		(ParamFloat<px4::params::ADRC_Y_KP>) _param_mc_adrc_y_kp,
+		(ParamFloat<px4::params::ADRC_R_KD>) _param_mc_adrc_r_kd,
+		(ParamFloat<px4::params::ADRC_P_KD>) _param_mc_adrc_p_kd,
+		(ParamFloat<px4::params::ADRC_Y_KD>) _param_mc_adrc_y_kd,
+		(ParamFloat<px4::params::ADRC_ALPHA>) _param_mc_adrc_alpha,
+		(ParamFloat<px4::params::ADRC_DELTA>) _param_mc_adrc_delta,
+		(ParamFloat<px4::params::ADRC_TD_R>) _param_mc_adrc_td_r,
+		(ParamFloat<px4::params::ADRC_TD_H0>) _param_mc_adrc_td_h0,
+		(ParamFloat<px4::params::ADRC_R_B0>) _param_mc_adrc_r_b0,
+		(ParamFloat<px4::params::ADRC_P_B0>) _param_mc_adrc_p_b0,
+		(ParamFloat<px4::params::ADRC_Y_B0>) _param_mc_adrc_y_b0,
+
 		(ParamFloat<px4::params::MC_ROLLRATE_P>) _param_mc_rollrate_p,
 		(ParamFloat<px4::params::MC_ROLLRATE_I>) _param_mc_rollrate_i,
 		(ParamFloat<px4::params::MC_RR_INT_LIM>) _param_mc_rr_int_lim,
